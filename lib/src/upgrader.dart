@@ -112,6 +112,7 @@ class Upgrader {
   PackageInfo? _packageInfo;
 
   String? _installedVersion;
+  String? _installedBuildVersion;
   String? _appStoreVersion;
   String? _appStoreListingURL;
   String? _releaseNotes;
@@ -175,6 +176,7 @@ class Upgrader {
     await _updateVersionInfo();
 
     _installedVersion = _packageInfo!.version;
+    _installedBuildVersion = _packageInfo!.buildNumber;
 
     return true;
   }
@@ -275,13 +277,15 @@ class Upgrader {
 
   String? currentInstalledVersion() => _installedVersion;
 
+  String? currentInstalledBuildVersion() => _installedBuildVersion;
+
   String? get releaseNotes => _releaseNotes;
 
   String message() {
     var msg = messages!.message(UpgraderMessage.body)!;
     msg = msg.replaceAll('{{appName}}', appName());
     msg = msg.replaceAll(
-        '{{currentAppStoreVersion}}', currentAppStoreVersion() ?? '');
+        '{{currentAppStoreVersion}}', currentAppStoreVersion()?.split('+')[0] ?? '');
     msg = msg.replaceAll(
         '{{currentInstalledVersion}}', currentInstalledVersion() ?? '');
     return msg;
@@ -351,8 +355,17 @@ class Upgrader {
     if (minAppVersion != null) {
       try {
         final minVersion = Version.parse(minAppVersion!);
+        Version minBuildVersion;
+        if (minVersion.build.isEmpty) {
+          minBuildVersion = Version.parse('0');
+        } else {
+          minBuildVersion = Version.parse(minVersion.build);
+        }
         final installedVersion = Version.parse(_installedVersion!);
-        rv = installedVersion < minVersion;
+        final installedBuildVersion = Version.parse(_installedBuildVersion!);
+        rv = installedVersion < minVersion ||
+            (installedVersion == minVersion &&
+                installedBuildVersion < minBuildVersion);
       } catch (e) {
         print(e);
       }
@@ -386,6 +399,7 @@ class Upgrader {
     if (debugLogging) {
       print('upgrader: appStoreVersion: $_appStoreVersion');
       print('upgrader: installedVersion: $_installedVersion');
+      print('upgrader: installedBuildVersion: $_installedBuildVersion');
       print('upgrader: minAppVersion: $minAppVersion');
     }
     if (_appStoreVersion == null || _installedVersion == null) {
@@ -397,9 +411,18 @@ class Upgrader {
 
     if (_updateAvailable == null) {
       final appStoreVersion = Version.parse(_appStoreVersion!);
+      Version appStoreBuildVersion;
+      if (appStoreVersion.build.isEmpty) {
+        appStoreBuildVersion = Version.parse('0');
+      } else {
+        appStoreBuildVersion = Version.parse(appStoreVersion.build);
+      }
       final installedVersion = Version.parse(_installedVersion!);
+      final installedBuildVersion = Version.parse(_installedBuildVersion!);
 
-      final available = appStoreVersion > installedVersion;
+      final available = appStoreVersion > installedVersion ||
+          (appStoreVersion == installedVersion &&
+              appStoreBuildVersion > installedBuildVersion);
       _updateAvailable = available ? _appStoreVersion : null;
     }
     if (debugLogging) {
